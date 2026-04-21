@@ -197,7 +197,75 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
 // The caller is responsible for calling free(*data_out).
 // Returns 0 on success, -1 on error (file not found, corrupt, etc.).
 int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out) {
-    // TODO: Implement
-    (void)id; (void)type_out; (void)data_out; (void)len_out;
-    return -1;
+    // 1. Build file path
+    char path[512];
+    object_path(id, path, sizeof(path));
+
+    // 2. Open and get file size
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+
+    fseek(f, 0, SEEK_END);
+    long full_len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    // 3. Read entire file into memory
+    uint8_t *buffer = malloc(full_len);
+    if (!buffer) {
+        fclose(f);
+        return -1;
+    }
+
+    if (fread(buffer, 1, full_len, f) != (size_t)full_len) {
+        free(buffer);
+        fclose(f);
+        return -1;
+    }
+    fclose(f);
+
+    // 4. Verify integrity: recompute hash and compare
+    ObjectID actual_id;
+    compute_hash(buffer, full_len, &actual_id);
+    if (memcmp(id->hash, actual_id.hash, HASH_SIZE) != 0) {
+        fprintf(stderr, "Error: Object integrity check failed for %s\n", path);
+        free(buffer);
+        return -1;
+    }
+
+    // 5. Find the null separator between header and data
+    uint8_t *null_byte = memchr(buffer, '\0', full_len);
+    if (!null_byte) {
+        free(buffer);
+        return -1;
+    }
+
+    // 6. Parse header (e.g., "blob 12")
+    char *header = (char *)buffer;
+    size_t header_len = (null_byte - buffer) + 1;
+    size_t content_len = full_len - header_len;
+
+    if (strncmp(header, "blob ", 5) == 0) {
+        *type_out = OBJ_BLOB;
+    } else if (strncmp(header, "tree ", 5) == 0) {
+        *type_out = OBJ_TREE;
+    } else if (strncmp(header, "commit ", 7) == 0) {
+        *type_out = OBJ_COMMIT;
+    } else {
+        free(buffer);
+        return -1;
+    }
+
+    // 7. Extract data portion
+    void *data = malloc(content_len);
+    if (!data) {
+        free(buffer);
+        return -1;
+    }
+    memcpy(data, null_byte + 1, content_len);
+
+    *data_out = data;
+    *len_out = content_len;
+
+    free(buffer);
+    return 0;
 }
