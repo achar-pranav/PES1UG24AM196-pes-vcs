@@ -116,6 +116,9 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 
 // ─── TODO: Implement these ──────────────────────────────────────────────────
 
+// Forward declaration of external functions
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+
 // Build a tree hierarchy from the current index and write all tree
 // objects to the object store.
 //
