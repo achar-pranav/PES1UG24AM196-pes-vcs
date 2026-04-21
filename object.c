@@ -129,8 +129,9 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     object_path(id_out, path, sizeof(path));
 
     // Create the directory part: .pes/objects/XX
-    char dir_path[512];
-    strncpy(dir_path, path, 512);
+    char dir_path[520];
+    strncpy(dir_path, path, sizeof(dir_path));
+    dir_path[sizeof(dir_path) - 1] = '\0';
     char *last_slash = strrchr(dir_path, '/');
     if (last_slash) {
         *last_slash = '\0';
@@ -138,7 +139,7 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     }
 
     // 7. Write atomically: Temp file -> fsync -> rename
-    char temp_path[512];
+    char temp_path[520];
     snprintf(temp_path, sizeof(temp_path), "%s.tmp", path);
 
     int fd = open(temp_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);

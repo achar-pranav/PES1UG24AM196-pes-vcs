@@ -172,17 +172,23 @@ int index_save(const Index *index) {
     FILE *f = fopen(temp_path, "w");
     if (!f) return -1;
 
-    // Create a mutable copy to sort
-    Index sorted_index = *index;
-    qsort(sorted_index.entries, sorted_index.count, sizeof(IndexEntry), compare_index_entries);
+    // Allocate on heap to avoid stack overflow (~5MB struct)
+    IndexEntry *entries_copy = malloc(index->count * sizeof(IndexEntry));
+    if (!entries_copy) {
+        fclose(f);
+        return -1;
+    }
+    memcpy(entries_copy, index->entries, index->count * sizeof(IndexEntry));
+    qsort(entries_copy, index->count, sizeof(IndexEntry), compare_index_entries);
 
-    for (int i = 0; i < sorted_index.count; i++) {
-        const IndexEntry *e = &sorted_index.entries[i];
+    for (int i = 0; i < index->count; i++) {
+        const IndexEntry *e = &entries_copy[i];
         char hex[HASH_HEX_SIZE + 1];
         hash_to_hex(&e->hash, hex);
         fprintf(f, "%o %s %lu %u %s\n", e->mode, hex, e->mtime_sec, e->size, e->path);
     }
 
+    free(entries_copy);
     fflush(f);
     fsync(fileno(f));
     fclose(f);
