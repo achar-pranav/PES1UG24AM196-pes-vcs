@@ -155,14 +155,15 @@ int head_update(const ObjectID *new_commit) {
     fclose(f);
     line[strcspn(line, "\r\n")] = '\0';
 
-    char target_path[520];
+    char target_path[512];
     if (strncmp(line, "ref: ", 5) == 0) {
         snprintf(target_path, sizeof(target_path), "%s/%s", PES_DIR, line + 5);
     } else {
-        snprintf(target_path, sizeof(target_path), "%s", HEAD_FILE); // Detached HEAD
+        strncpy(target_path, HEAD_FILE, sizeof(target_path));
+        target_path[sizeof(target_path) - 1] = '\0';
     }
 
-    char tmp_path[528];
+    char tmp_path[520];
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", target_path);
     
     f = fopen(tmp_path, "w");
